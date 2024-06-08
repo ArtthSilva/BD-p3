@@ -1,0 +1,89 @@
+
+--Trigger para registro de data e hora das atualizações--
+
+CREATE OR REPLACE FUNCTION registro_ultima_atualizacao()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.ultima_atualizacao = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_ultima_atualizacao
+BEFORE UPDATE ON loja
+FOR EACH ROW
+EXECUTE FUNCTION registro_ultima_atualizacao();
+
+-- Trigger para verificar se a idade é maior ou igual a 18 anos na tabela funcionários
+CREATE OR REPLACE FUNCTION verifica_idade()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.idade < 18 THEN
+        NEW.endereco := NEW.endereco || ' (Menor Aprendiz)';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_verifica_idade
+BEFORE INSERT ON funcionarios
+FOR EACH ROW
+EXECUTE FUNCTION verifica_idade();
+
+-- Trigger para gerar uma nova entrada na tabela--
+
+historico_produto sempre que um registro na tabela produtos é atualizado
+CREATE OR REPLACE FUNCTION gerar_entrada_historico_produtos()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO historico_produto (produto_id, nome, preco, estoque, data_atualizacao)
+    VALUES (NEW.id, NEW.nome, NEW.preco, NEW.estoque, CURRENT_TIMESTAMP);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_gerar_entrada_historico_produtos
+AFTER UPDATE ON produtos
+FOR EACH ROW
+EXECUTE FUNCTION gerar_entrada_historico_produtos();
+
+--Consulta para saber se é aprendiz ou não--
+SELECT 
+    id,
+    nome,
+    idade,
+    CASE 
+        WHEN idade < 18 THEN 'Aprendiz'
+        ELSE 'Não Aprendiz'
+    END AS status
+FROM 
+    funcionarios;
+
+--Consulta para saber a última atualização de uma loja--
+SELECT 
+    id,
+    nome,
+    localizacao,
+    ultima_atualizacao
+FROM 
+    loja
+ORDER BY 
+    ultima_atualizacao DESC
+LIMIT 1;
+
+
+-- Função que será chamada pela trigger
+CREATE OR REPLACE FUNCTION atualizar_historico_produto()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO historico_produto (produto_id, nome, preco, estoque, data_atualizacao)
+    VALUES (NEW.id, NEW.nome, NEW.preco, NEW.estoque, CURRENT_TIMESTAMP);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger que chama a função sempre que um registro na tabela produtos é atualizado
+CREATE TRIGGER trigger_atualizar_historico_produto
+AFTER UPDATE ON produtos
+FOR EACH ROW
+EXECUTE FUNCTION atualizar_historico_produto();
